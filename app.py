@@ -23,8 +23,8 @@ if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
 client = WebApplicationClient(GOOGLE_CLIENT_ID)
 
 # Folder to save downloaded files
-# Changed to be inside 'static' for easier serving, though send_file is used
-DOWNLOAD_FOLDER = os.path.join(app.static_folder, "downloads") if app.static_folder else "static/downloads"
+# Ensure DOWNLOAD_FOLDER is correctly set relative to the app's root
+DOWNLOAD_FOLDER = os.path.join(os.getcwd(), "static", "downloads")
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)
 
@@ -145,27 +145,29 @@ def download_video():
         with yt_dlp.YoutubeDL(current_ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             
-            # Get the actual downloaded file path
-            # yt-dlp might download as .webm and then convert to .mp3
-            # We need to find the final file path after post-processing
-            file_path = None
+            # yt-dlp returns the actual filepath in 'requested_downloads' or 'filepath' for single files
+            # Ensure we get the final path after post-processing
+            final_filepath = None
             if 'requested_downloads' in info and info['requested_downloads']:
-                # For single file, it's usually the first one
-                file_path = info['requested_downloads'][0]['filepath']
-            elif '_format_note' in info and 'filename' in info:
-                # Fallback for simpler cases
-                file_path = os.path.join(DOWNLOAD_FOLDER, info['filename'])
+                # This is the most reliable way to get the final path after post-processing
+                final_filepath = info['requested_downloads'][0]['filepath']
+            elif 'filepath' in info:
+                final_filepath = info['filepath']
             else:
-                # Try to construct from outtmpl if direct path not found
-                # This is a bit tricky, relying on outtmpl pattern
+                # Fallback: try to construct from outtmpl if direct path not found
+                # This is less reliable but can work if the above don't
                 base_name = ydl.prepare_filename(info)
                 if download_format == 'mp3' and not base_name.endswith('.mp3'):
-                    file_path = os.path.splitext(base_name)[0] + '.mp3'
+                    final_filepath = os.path.splitext(base_name)[0] + '.mp3'
                 else:
-                    file_path = base_name
-
+                    final_filepath = base_name
+            
             # Ensure the file path is relative to DOWNLOAD_FOLDER for serving
-            relative_file_path = os.path.relpath(file_path, DOWNLOAD_FOLDER)
+            # And that it's within the DOWNLOAD_FOLDER to prevent directory traversal
+            if final_filepath and os.path.commonpath([DOWNLOAD_FOLDER, final_filepath]) == DOWNLOAD_FOLDER:
+                relative_file_path = os.path.relpath(final_filepath, DOWNLOAD_FOLDER)
+            else:
+                raise Exception("Downloaded file path is outside the expected directory.")
             
             # Add to history
             entry = {
@@ -193,11 +195,13 @@ def download_video():
 @app.route('/get_file/<path:filename>', methods=['GET'])
 @login_required
 def get_file(filename):
+    # Ensure filename is safe and within the DOWNLOAD_FOLDER
     full_path = os.path.join(DOWNLOAD_FOLDER, filename)
-    if os.path.exists(full_path):
+    # Use os.path.abspath and os.path.commonpath to prevent directory traversal
+    if os.path.exists(full_path) and os.path.commonpath([DOWNLOAD_FOLDER, full_path]) == DOWNLOAD_FOLDER:
         return send_file(full_path, as_attachment=True)
     else:
-        return jsonify({'error': 'File not found'}), 404
+        return jsonify({'error': 'File not found or unauthorized access attempt'}), 404
 
 @app.route('/get_history', methods=['GET'])
 @login_required

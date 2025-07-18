@@ -10,7 +10,8 @@ services:
     name: youtube-downloader
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    # Updated startCommand to use python -m gunicorn and bind to the PORT environment variable
+    startCommand: "python -m gunicorn --bind 0.0.0.0:$PORT app:app"
     envVars:
       - key: PYTHON_VERSION
         value: 3.9
@@ -25,5 +26,5 @@ services:
     regions:
       - oregon
     plan: free
-    healthCheckPath: /
+    healthCheckPath: / # Changed from /dashboard to / as main UI is now at root
     autoDeploy: true
