@@ -1,0 +1,29 @@
+# Render Blueprint configuration
+databases:
+  - name: youtube-downloader-db
+    databaseName: youtube_db
+    user: user
+    plan: free
+
+services:
+  - type: web
+    name: youtube-downloader
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+    regions:
+      - oregon
+    plan: free
+    healthCheckPath: /
+    autoDeploy: true

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Downloader</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container-border {
+            border: 2px solid #00BFFF; /* DeepSkyBlue border */
+            border-radius: 1rem; /* Rounded corners */
+            padding: 1.5rem;
+            background-color: #2d3748; /* Darker gray background for inner container */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 900px; /* Increased max-width */
+            width: 95%; /* Fluid width */
+        }
+        .btn-group button {
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            margin-right: 0.5rem;
+            background-color: #4a5568; /* Gray background for inactive buttons */
+            color: #cbd5e0; /* Light text color */
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-group button.active {
+            background-color: #00BFFF; /* DeepSkyBlue for active button */
+            color: white;
+        }
+        .btn-primary {
+            background-color: #00BFFF; /* DeepSkyBlue */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .btn-primary:hover {
+            background-color: #009ACD; /* Darker DeepSkyBlue on hover */
+        }
+        .btn-secondary {
+            background-color: #4a5568; /* Gray */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .btn-secondary:hover {
+            background-color: #2d3748; /* Darker gray on hover */
+        }
+        input[type="text"], select {
+            background-color: #4a5568; /* Darker input background */
+            border: 1px solid #6b7280; /* Gray border */
+            color: white;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #4a5568; /* Darker border for table rows */
+            color: #cbd5e0; /* Light text color */
+        }
+        th {
+            background-color: #4a5568; /* Darker gray for table header */
+            color: white;
+        }
+        td.status-success {
+            color: #38a169; /* Green for success */
+        }
+        td a {
+            color: #00BFFF; /* DeepSkyBlue for links */
+            text-decoration: none;
+        }
+        td a:hover {
+            text-decoration: underline;
+        }
+        .message-box {
+            background-color: #4a5568;
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            display: none; /* Hidden by default */
+        }
+        .message-box.error {
+            background-color: #e53e3e; /* Red for errors */
+        }
+        .message-box.success {
+            background-color: #38a169; /* Green for success */
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #00BFFF; /* Blue spinner */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+            margin-left: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+
+    <div class="container-border">
+        <h1 class="text-3xl font-bold text-center text-white mb-6">YouTube Video Downloader</h1>
+
+        <!-- Type Selection Buttons -->
+        <div class="flex justify-center mb-6 btn-group">
+            <button class="active" id="singleAudioBtn">Single Audio</button>
+            <button id="audioPlaylistBtn" disabled>Audio Playlist</button>
+            <button id="singleVideoBtn" disabled>Single Video</button>
+            <button id="videoPlaylistBtn" disabled>Video Playlist</button>
+        </div>
+
+        <!-- Input and Controls -->
+        <div class="flex flex-col md:flex-row gap-4 mb-6">
+            <input type="text" id="videoUrl" placeholder="YouTube Video URL" class="flex-grow">
+            <select id="formatSelect" class="w-full md:w-auto">
+                <option value="mp3">MP3</option>
+                <option value="mp4">MP4</option>
+            </select>
+            <button id="downloadBtn" class="btn-primary flex items-center justify-center">
+                Download
+                <div class="loading-spinner" id="downloadSpinner"></div>
+            </button>
+            <button id="stopBtn" class="btn-secondary" disabled>Stop</button>
+        </div>
+
+        <!-- Message Box -->
+        <div id="messageBox" class="message-box"></div>
+
+        <h2 class="text-2xl font-bold text-center text-white mt-8 mb-4">Download History</h2>
+
+        <!-- Download History Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Title</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    <!-- History rows will be inserted here by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const videoUrlInput = document.getElementById('videoUrl');
+        const formatSelect = document.getElementById('formatSelect');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const historyTableBody = document.getElementById('historyTableBody');
+        const messageBox = document.getElementById('messageBox');
+        const downloadSpinner = document.getElementById('downloadSpinner');
+
+        // Type selection buttons (currently only single audio is active/functional in backend)
+        const singleAudioBtn = document.getElementById('singleAudioBtn');
+        const audioPlaylistBtn = document.getElementById('audioPlaylistBtn');
+        const singleVideoBtn = document.getElementById('singleVideoBtn');
+        const videoPlaylistBtn = document.getElementById('videoPlaylistBtn');
+
+        let currentDownloadRequest = null; // To store the fetch promise for potential cancellation
+
+        // Event Listeners for type selection buttons
+        singleAudioBtn.addEventListener('click', () => {
+            setActiveButton(singleAudioBtn);
+            // Logic for single audio (default)
+        });
+        // Other buttons are disabled for now as backend only supports single video/audio
+        audioPlaylistBtn.addEventListener('click', () => setActiveButton(audioPlaylistBtn));
+        singleVideoBtn.addEventListener('click', () => setActiveButton(singleVideoBtn));
+        videoPlaylistBtn.addEventListener('click', () => setActiveButton(videoPlaylistBtn));
+
+        function setActiveButton(activeButton) {
+            [singleAudioBtn, audioPlaylistBtn, singleVideoBtn, videoPlaylistBtn].forEach(btn => {
+                btn.classList.remove('active');
+            });
+            activeButton.classList.add('active');
+        }
+
+        // Function to display messages
+        function showMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            messageBox.className = `message-box ${type}`; // Reset classes
+            messageBox.style.display = 'block';
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 5000);
+        }
+
+        // Function to render history table
+        function renderHistory(history) {
+            historyTableBody.innerHTML = ''; // Clear existing rows
+            if (history.length === 0) {
+                historyTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4">No downloads yet.</td></tr>';
+                return;
+            }
+            history.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.title}</td>
+                    <td class="status-${item.status.toLowerCase()}">${item.status}</td>
+                    <td>
+                        ${item.status === 'Success' ? `<a href="${url_for_static_file(item.file_name)}" target="_blank" class="text-blue-400 hover:underline">Download</a>` : 'N/A'}
+                    </td>
+                `;
+                historyTableBody.appendChild(row);
+            });
+        }
+
+        // Helper to get static file URL (adjust for Flask's static folder)
+        function url_for_static_file(filename) {
+            // Assuming Flask serves static files from /static/
+            // And our downloads are in static/downloads
+            return `/static/downloads/${filename}`;
+        }
+
+        // Fetch initial history when page loads
+        async function fetchHistory() {
+            try {
+                const response = await fetch('/get_history');
+                if (response.ok) {
+                    const history = await response.json();
+                    renderHistory(history);
+                } else {
+                    showMessage('Failed to load download history.', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching history:', error);
+                showMessage('Error fetching download history.', 'error');
+            }
+        }
+
+        // Handle download button click
+        downloadBtn.addEventListener('click', async () => {
+            const url = videoUrlInput.value.trim();
+            const format = formatSelect.value;
+
+            if (!url) {
+                showMessage('Please enter a YouTube video URL.', 'error');
+                return;
+            }
+
+            downloadBtn.disabled = true;
+            stopBtn.disabled = false;
+            downloadSpinner.style.display = 'block';
+            showMessage('Download in progress...', 'info');
+
+            try {
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url, format: format })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(data.message, 'success');
+                    videoUrlInput.value = ''; // Clear input field
+                    fetchHistory(); // Refresh history
+                } else {
+                    const errorData = await response.json();
+                    showMessage(`Error: ${errorData.error || 'Unknown error occurred.'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Download error:', error);
+                showMessage(`Network error or download failed: ${error.message}`, 'error');
+            } finally {
+                downloadBtn.disabled = false;
+                stopBtn.disabled = true;
+                downloadSpinner.style.display = 'none';
+            }
+        });
+
+        // Handle stop button click (placeholder for future implementation)
+        stopBtn.addEventListener('click', () => {
+            // In a real-world scenario, you'd send a request to the backend
+            // to stop the download process. This is more complex to implement.
+            showMessage('Stop functionality is not yet implemented.', 'info');
+            downloadBtn.disabled = false;
+            stopBtn.disabled = true;
+            downloadSpinner.style.display = 'none';
+        });
+
+        // Initial fetch of history
+        fetchHistory();
+
+        // Check login status on page load (optional, Flask-Login handles redirects)
+        // If user is not logged in, Flask-Login's @login_required decorator will redirect to /login
+        // So no explicit JS check is needed here for basic functionality.
+    </script>
+</body>
+</html>

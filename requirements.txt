@@ -1,5 +1,6 @@
 Flask==2.3.2
 Flask-Login==0.6.2
+oauthlib==3.2.2
 requests==2.28.1
 yt-dlp==2023.7.6
-gunicorn==20.1.0  # এই লাইনটি যোগ করুন
+gunicorn==21.2.0
